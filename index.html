@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="uz"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Davomat va to'lov daftari</title>
+<style>
+:root{--bg:#f5f6f4;--card:#fff;--ink:#1d2624;--mute:#68746f;--line:#d9dfdb;--acc:#1f6f5c;--acc2:#e8f1ee;--danger:#b3402f}
+@media (prefers-color-scheme:dark){:root{--bg:#161b1a;--card:#1f2624;--ink:#e8eeec;--mute:#93a09b;--line:#33403c;--acc:#4fb79d;--acc2:#24332f;--danger:#e37a68}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:20px}
+.wrap{max-width:1200px;margin:0 auto}
+h1{font-size:1.4rem;margin:0}
+.sub{margin:2px 0 16px;color:var(--mute)}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+button,.btn{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover,.btn:hover{background:var(--acc2)}
+:focus-visible,.btn:focus-within{outline:2px solid var(--acc);outline-offset:1px}
+.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+.primary:hover{background:var(--acc);opacity:.9}
+.btn input{display:none}
+.info{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+.info label{display:block;font-size:.85rem;color:var(--mute)}
+.info input{width:100%;font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--ink)}
+.box{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+th,td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:0}
+th:last-child,td:last-child{border-right:0}
+th{background:var(--acc2);font-size:.9rem}
+td input,th{padding:8px 8px}
+th input{width:100%;border:0;background:transparent;color:inherit;font:inherit;font-weight:600;min-width:64px;padding:0}
+th.n{width:40px}
+td input{width:100%;border:0;background:transparent;color:inherit;font:inherit;min-width:64px}
+td.n{text-align:center;color:var(--mute);width:40px}
+td.nm input{min-width:190px}
+td.x{width:38px;text-align:center}
+.del{border:0;background:none;color:var(--danger);padding:4px 10px;font-size:1.1rem}
+#msg{color:var(--acc);min-height:1.4em}
+[hidden]{display:none!important}
+#auth{max-width:380px;margin:12vh auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px}
+#auth input{width:100%;font:inherit;padding:9px 10px;margin:4px 0 12px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--ink)}
+#auth .row{display:flex;gap:8px}#auth .row button{flex:1}
+#aerr{color:var(--danger);min-height:1.4em;font-size:.9rem;margin-top:10px}
+</style></head><body>
+<div id="auth" hidden>
+<h1>Kirish</h1><p class="sub">Daftaringizga kirish uchun email va parol kiriting.</p>
+<label for="email">Email</label><input id="email" type="email" autocomplete="username">
+<label for="pass">Parol (kamida 6 belgi)</label><input id="pass" type="password" autocomplete="current-password">
+<div class="row"><button class="primary" id="in">Kirish</button><button id="up">Ro‘yxatdan o‘tish</button></div>
+<div id="aerr" role="alert"></div></div>
+<div class="wrap" id="app" hidden>
+<h1>O‘quvchilarning davomat va to‘lov hisobi daftari</h1>
+<p class="sub">Fan: Ingliz tili. Katakka bosib yozing, so‘ng PDF qilib yuklab oling. Kirgan: <span id="who"></span></p>
+<div class="info" id="info"></div>
+<div class="bar">
+<button id="addRow">+ Qator</button>
+<button id="addCol">+ Ustun</button>
+<button id="delCol">− Oxirgi ustun</button>
+<label class="btn">Fayl yuklash (Excel / CSV)<input type="file" id="file" accept=".xlsx,.xls,.csv"></label>
+<button id="clear">Belgilarni tozalash</button>
+<button id="out">Chiqish</button>
+<button id="pdf" class="primary">PDF yuklab olish</button>
+</div>
+<div class="box"><table id="tbl"></table></div>
+<div id="msg" role="status"></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+var KEY="davomat-v1";
+var FIELDS=["O‘quv yili","Boshlangan sana","O‘qituvchi","Xona / guruh","Dars kunlari","Dars vaqti","Oylik to‘lov summasi (so‘m)"];
+var HEAD=["T/r","Ism familiya","Sinf","Tel nomer","Sentyabr","Oktyabr","Noyabr","Dekabr","Yanvar","Fevral","Mart","Aprel"];
+var names=["Eshboyeva Lobar","Adhamova Rayhona","Bahodirova Xosila","Abduvahobova Asila","Adhamov Behruzbek","Usmonqulov Nurbek","Amirdinov Sevinch","Usmonqulov Humoyun","Eshbulova Sabina","Xadarova Zarnigor","Norqulov Fayozbek","Usmonqulov Maqsud","Esonboyev Parvozbek","Amirdinov Sardorbek"];
+function blank(n){var r=[n||""];for(var i=1;i<data.head.length;i++)r.push("");return r}
+var data={head:HEAD.slice(1),info:["2026–2027","6-sentyabr","","","Dushanba / Chorshanba / Juma","",""],rows:[]};
+for(var i=0;i<30;i++)data.rows.push(blank(names[i]||""));
+try{var s=localStorage.getItem(KEY);if(s)data=JSON.parse(s)}catch(e){}
+if(!data.head)data.head=HEAD.slice(1);
+var tbl=document.getElementById("tbl"),msg=document.getElementById("msg");
+var sb=null,uid=null,tm=null;
+function save(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}
+if(!sb||!uid)return;clearTimeout(tm);tm=setTimeout(cloud,800)}
+function cloud(){say("Saqlanmoqda...");sb.from("registers").upsert({user_id:uid,data:data,updated_at:new Date().toISOString()}).then(function(r){say(r.error?"Saqlanmadi. Internetni tekshiring.":"Saqlandi")})}
+function say(t){msg.textContent=t;setTimeout(function(){if(msg.textContent===t)msg.textContent=""},3000)}
+function mk(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt!==undefined)e.textContent=txt;return e}
+
+var info=document.getElementById("info");
+function buildInfo(){info.innerHTML="";FIELDS.forEach(function(f,i){
+  var l=mk("label","",f),inp=mk("input");inp.value=data.info[i]||"";
+  inp.oninput=function(){data.info[i]=inp.value;save()};
+  l.appendChild(inp);info.appendChild(l);
+})}
+buildInfo();
+
+function render(){
+  tbl.innerHTML="";
+  var hr=mk("tr");hr.appendChild(mk("th","n","T/r"));data.head.forEach(function(h,c){var th=mk("th"),i=mk("input");i.value=h;i.setAttribute("aria-label","Ustun nomi");i.oninput=function(){data.head[c]=i.value;save()};th.appendChild(i);hr.appendChild(th)});hr.appendChild(mk("th"));tbl.appendChild(hr);
+  data.rows.forEach(function(row,r){
+    var tr=mk("tr");tr.appendChild(mk("td","n",r+1));
+    row.forEach(function(v,c){
+      var td=mk("td",c===0?"nm":""),i=mk("input");i.value=v;
+      i.oninput=function(){data.rows[r][c]=i.value;save()};
+      td.appendChild(i);tr.appendChild(td);
+    });
+    var xd=mk("td","x"),b=mk("button","del","×");b.title="Qatorni o‘chirish";b.setAttribute("aria-label","Qatorni o‘chirish");
+    b.onclick=function(){data.rows.splice(r,1);save();render()};
+    xd.appendChild(b);tr.appendChild(xd);tbl.appendChild(tr);
+  });
+}
+document.getElementById("addRow").onclick=function(){data.rows.push(blank());save();render()};
+document.getElementById("addCol").onclick=function(){data.head.push("Yangi ustun");data.rows.forEach(function(r){r.push("")});save();render();say("Ustun qo‘shildi. Nomini sarlavhada o‘zgartiring.")};
+document.getElementById("delCol").onclick=function(){if(data.head.length<=1)return;if(confirm("Oxirgi ustun ("+data.head[data.head.length-1]+") o‘chirilsinmi?")){data.head.pop();data.rows.forEach(function(r){r.pop()});save();render()}};
+document.getElementById("clear").onclick=function(){
+  if(confirm("Sinf, telefon va oylik belgilari o‘chirilsinmi? Ismlar qoladi.")){
+    data.rows=data.rows.map(function(r){return [r[0]].concat(r.slice(1).map(function(){return ""}))});save();render()}
+};
+
+document.getElementById("file").onchange=function(e){
+  var f=e.target.files[0];if(!f)return;
+  var rd=new FileReader();
+  rd.onload=function(){
+    try{
+      var wb=XLSX.read(rd.result,{type:"array"});
+      var a=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:""});
+      a=a.filter(function(r){return String(r[1]||"").trim()!==""&&!/ism/i.test(String(r[1]))});
+      if(!a.length){say("Faylda ism topilmadi.");return}
+      data.rows=a.map(function(r){var o=[];for(var i=1;i<=data.head.length;i++)o.push(r[i]===undefined?"":String(r[i]));return o});
+      save();render();say("Fayl yuklandi.");
+    }catch(err){say("Faylni o‘qib bo‘lmadi. Excel yoki CSV yuklang.")}
+  };
+  rd.readAsArrayBuffer(f);e.target.value="";
+};
+
+document.getElementById("pdf").onclick=function(){
+  say("PDF tayyorlanmoqda...");
+  var box=mk("div");
+  box.style.cssText="position:fixed;left:-9999px;top:0;background:#fff;color:#000;padding:24px;font:14px/1.4 Arial,sans-serif;width:1500px";
+  var h=mk("div","","O‘QUVCHILARNING DAVOMAT VA TO‘LOV HISOBI DAFTARI");h.style.cssText="font-size:22px;font-weight:700;text-align:center;margin-bottom:4px";box.appendChild(h);
+  var fan=mk("div","","FAN: INGLIZ TILI");fan.style.cssText="text-align:center;font-weight:700;margin-bottom:12px";box.appendChild(fan);
+  var g=mk("div");g.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;margin-bottom:12px";
+  FIELDS.forEach(function(f,i){var d=mk("div");var b=mk("b","",f.replace(" (so‘m)","").toUpperCase()+": ");d.appendChild(b);d.appendChild(document.createTextNode((data.info[i]||"")+(i===6&&data.info[i]?" so‘m":"")));g.appendChild(d)});
+  box.appendChild(g);
+  var t=mk("table");t.style.cssText="border-collapse:collapse;width:100%";
+  function row(arr,th,i){var tr=mk("tr");arr.forEach(function(v,c){var e=mk(th?"th":"td","",v);e.style.cssText="border:1px solid #444;padding:6px 6px;height:28px;text-align:"+(c===1||c===3&&false?"left":"center")+";"+(th?"background:#e6e6e6;":"");if(c===1&&!th)e.style.textAlign="left";tr.appendChild(e)});t.appendChild(tr)}
+  row(["T/r"].concat(data.head),true);
+  data.rows.forEach(function(r,i){row([String(i+1)].concat(r),false)});
+  box.appendChild(t);document.body.appendChild(box);
+  html2canvas(box,{scale:2,backgroundColor:"#fff"}).then(function(cv){
+    document.body.removeChild(box);
+    var doc=new window.jspdf.jsPDF({orientation:"l",unit:"mm",format:"a4"});
+    var pw=doc.internal.pageSize.getWidth()-14,ph=doc.internal.pageSize.getHeight()-14;
+    var sc=pw/cv.width,pageH=Math.floor(ph/sc),y=0,first=true;
+    while(y<cv.height){
+      var hh=Math.min(pageH,cv.height-y),p=mk("canvas");p.width=cv.width;p.height=hh;
+      p.getContext("2d").drawImage(cv,0,y,cv.width,hh,0,0,cv.width,hh);
+      if(!first)doc.addPage();
+      doc.addImage(p.toDataURL("image/jpeg",0.95),"JPEG",7,7,pw,hh*sc);
+      y+=hh;first=false;
+    }
+    doc.save("davomat-hisobi.pdf");say("PDF yuklab olindi.");
+  }).catch(function(){say("PDF yasashda xatolik bo‘ldi.")});
+};
+render();
+
+var SB_URL="https://zcxemisntksklrdtvffv.supabase.co",SB_KEY="sb_publishable_0oH3JEXo_t1CZfuIIXD7jQ_4NnaB-LH";
+var auth=document.getElementById("auth"),app=document.getElementById("app"),aerr=document.getElementById("aerr");
+function start(ses){
+  uid=ses.user.id;document.getElementById("who").textContent=ses.user.email;auth.hidden=true;app.hidden=false;
+  sb.from("registers").select("data").maybeSingle().then(function(r){
+    var d=r.data&&r.data.data;
+    if(d&&d.rows){data=d;if(!data.head)data.head=HEAD.slice(1);try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}buildInfo();render()}
+    else cloud();
+  });
+}
+function msgOf(m){
+  if(/invalid login/i.test(m))return "Email yoki parol noto‘g‘ri.";
+  if(/already registered/i.test(m))return "Bu email ro‘yxatdan o‘tgan. «Kirish» tugmasini bosing.";
+  if(/valid email|invalid email/i.test(m))return "Email noto‘g‘ri yozilgan.";
+  return m;
+}
+function go(up){
+  var e=document.getElementById("email").value.trim(),p=document.getElementById("pass").value;aerr.textContent="";
+  if(!e||p.length<6){aerr.textContent="Email va kamida 6 belgili parol kiriting.";return}
+  var f=up?sb.auth.signUp({email:e,password:p}):sb.auth.signInWithPassword({email:e,password:p});
+  f.then(function(r){
+    if(r.error){aerr.textContent=msgOf(r.error.message);return}
+    if(!r.data.session){aerr.textContent="Emailingizga tasdiqlash havolasi yuborildi. Uni bosib, keyin kiring.";return}
+    start(r.data.session);
+  });
+}
+document.getElementById("in").onclick=function(){go(false)};
+document.getElementById("up").onclick=function(){go(true)};
+document.getElementById("pass").onkeydown=function(e){if(e.key==="Enter")go(false)};
+document.getElementById("out").onclick=function(){sb.auth.signOut().then(function(){try{localStorage.removeItem(KEY)}catch(e){}location.reload()})};
+if(window.supabase){
+  sb=window.supabase.createClient(SB_URL,SB_KEY);
+  sb.auth.getSession().then(function(r){if(r.data.session)start(r.data.session);else auth.hidden=false});
+}else{auth.hidden=false;aerr.textContent="Internetga ulanib bo‘lmadi. Sahifani yangilang."}
+</script></body></html>
