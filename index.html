@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="uz"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Farishta</title>
+<title>Davomat va to'lov daftari</title>
 <style>
 :root{--bg:#f5f6f4;--card:#fff;--ink:#1d2624;--mute:#68746f;--line:#d9dfdb;--acc:#1f6f5c;--acc2:#e8f1ee;--danger:#b3402f}
 @media (prefers-color-scheme:dark){:root{--bg:#161b1a;--card:#1f2624;--ink:#e8eeec;--mute:#93a09b;--line:#33403c;--acc:#4fb79d;--acc2:#24332f;--danger:#e37a68}}
@@ -31,6 +31,7 @@ th.n{width:40px}
 td input{width:100%;border:0;background:transparent;color:inherit;font:inherit;min-width:64px}
 td.n{text-align:center;color:var(--mute);width:40px}
 td.nm input{min-width:190px}
+td.tel input{min-width:135px}
 td.x{width:38px;text-align:center}
 .del{border:0;background:none;color:var(--danger);padding:4px 10px;font-size:1.1rem}
 #msg{color:var(--acc);min-height:1.4em}
@@ -82,6 +83,7 @@ function save(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}
 if(!sb||!uid)return;clearTimeout(tm);tm=setTimeout(cloud,800)}
 function cloud(){say("Saqlanmoqda...");sb.from("registers").upsert({user_id:uid,data:data,updated_at:new Date().toISOString()}).then(function(r){say(r.error?"Saqlanmadi. Internetni tekshiring.":"Saqlandi")})}
 function say(t){msg.textContent=t;setTimeout(function(){if(msg.textContent===t)msg.textContent=""},3000)}
+function fmtTel(v){var d=String(v).replace(/\D/g,"");if(d.length===12&&d.slice(0,3)==="998")d=d.slice(3);d=d.slice(0,9);var o=d.slice(0,2);if(d.length>2)o+=" "+d.slice(2,5);if(d.length>5)o+=" "+d.slice(5,7);if(d.length>7)o+=" "+d.slice(7,9);return o}
 function mk(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt!==undefined)e.textContent=txt;return e}
 
 var info=document.getElementById("info");
@@ -98,8 +100,9 @@ function render(){
   data.rows.forEach(function(row,r){
     var tr=mk("tr");tr.appendChild(mk("td","n",r+1));
     row.forEach(function(v,c){
-      var td=mk("td",c===0?"nm":""),i=mk("input");i.value=v;
-      i.oninput=function(){data.rows[r][c]=i.value;save()};
+      var td=mk("td",c===0?"nm":c===2?"tel":""),i=mk("input");i.value=c===2?fmtTel(v):v;
+      if(c===2){i.inputMode="tel";i.placeholder="12 345 67 89"}
+      i.oninput=function(){if(c===2)i.value=fmtTel(i.value);data.rows[r][c]=i.value;save()};
       td.appendChild(i);tr.appendChild(td);
     });
     var xd=mk("td","x"),b=mk("button","del","×");b.title="Qatorni o‘chirish";b.setAttribute("aria-label","Qatorni o‘chirish");
@@ -138,18 +141,24 @@ document.getElementById("pdf").onclick=function(){
   var t=mk("table");t.style.cssText="border-collapse:collapse;width:100%;table-layout:fixed";
   function row(arr,th){var tr=mk("tr");arr.forEach(function(v,c){var e=mk(th?"th":"td","",v);
     e.style.cssText="border:1px solid #333;padding:0 6px;height:32px;overflow:hidden;white-space:nowrap;text-align:"+(c===1&&!th?"left":"center")+";"+(th?"background:#e3e3e3;font-weight:700;":"");
-    if(c===0)e.style.width="50px";if(c===1)e.style.width="300px";tr.appendChild(e)});t.appendChild(tr)}
+    if(c===0)e.style.width="50px";if(c===1)e.style.width="300px";if(c===3)e.style.width="135px";tr.appendChild(e)});t.appendChild(tr)}
   row(["T/r"].concat(data.head),true);
   data.rows.forEach(function(r,i){row([String(i+1)].concat(r),false)});
   tb.appendChild(t);
-  var ib=mk("div");ib.style.cssText=cs+"padding:30px 40px;font-size:26px;width:1000px";
-  var h1=mk("div","","O‘QUVCHILARNING DAVOMAT VA TO‘LOV HISOBI DAFTARI");h1.style.cssText="font-size:34px;font-weight:700;text-align:center;margin-bottom:10px";
-  var h2=mk("div","","FAN: INGLIZ TILI");h2.style.cssText="text-align:center;font-weight:700;font-size:28px;margin-bottom:34px";
-  ib.appendChild(h1);ib.appendChild(h2);
-  var g=mk("div");g.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:18px 40px";
-  FIELDS.forEach(function(f,i){var d=mk("div");d.style.cssText="border-bottom:1px solid #333;padding:6px 0;min-height:50px";if(i===6)d.style.gridColumn="1/-1";
-    d.appendChild(mk("b","",f.replace(" (so‘m)","").toUpperCase()+": "));
-    d.appendChild(document.createTextNode((data.info[i]||"")+(i===6&&data.info[i]?" so‘m":"")));g.appendChild(d)});
+  var NAVY="#1F3A5F",GOLD="#C9A227",SERIF="'Times New Roman',Georgia,serif";
+  var ib=mk("div");ib.style.cssText=cs+"width:1100px;padding-bottom:20px;font-family:Calibri,Carlito,Arial,sans-serif";
+  var bn=mk("div");bn.style.cssText="background:"+NAVY+";color:#fff;text-align:center;padding:34px 20px;font:700 42px/1.25 "+SERIF;
+  bn.appendChild(mk("div","","O‘QUVCHILARNING"));bn.appendChild(mk("div","","DAVOMAT VA TO‘LOV HISOBI DAFTARI"));ib.appendChild(bn);
+  var pw=mk("div");pw.style.cssText="text-align:center;margin:30px 0 34px";
+  var pill=mk("span","","FAN: INGLIZ TILI");pill.style.cssText="display:inline-block;background:"+GOLD+";color:"+NAVY+";font:700 26px "+SERIF+";padding:14px 60px;border-radius:4px";
+  pw.appendChild(pill);ib.appendChild(pw);
+  var g=mk("div");g.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:20px 36px;padding:0 24px";
+  FIELDS.forEach(function(f,i){
+    var v=(data.info[i]||"").trim();if(!v)return;
+    var d=mk("div");d.style.cssText="background:#F3F6FA;border:1px solid #E3E8EF;border-left:5px solid "+NAVY+";padding:14px 20px";
+    var l=mk("div","",f.replace(" (so‘m)","").toUpperCase());l.style.cssText="font-size:15px;color:#6B7280;letter-spacing:.5px";
+    var val=mk("div","",i===6?v+" so‘m":v);val.style.cssText="font-size:30px;font-weight:700;color:"+NAVY+";margin-top:6px";
+    d.appendChild(l);d.appendChild(val);g.appendChild(d)});
   ib.appendChild(g);
   var doc=new window.jspdf.jsPDF({orientation:"l",unit:"mm",format:"a4"});
   var W=doc.internal.pageSize.getWidth()-14,H=doc.internal.pageSize.getHeight()-14;
