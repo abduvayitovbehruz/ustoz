@@ -41,10 +41,10 @@ td.x{width:38px;text-align:center}
 #aerr{color:var(--danger);min-height:1.4em;font-size:.9rem;margin-top:10px}
 </style></head><body>
 <div id="auth" hidden>
-<h1>Kirish</h1><p class="sub">Daftaringizga kirish uchun email va parol kiriting.</p>
-<label for="email">Email</label><input id="email" type="email" autocomplete="username">
-<label for="pass">Parol (kamida 6 belgi)</label><input id="pass" type="password" autocomplete="current-password">
-<div class="row"><button class="primary" id="in">Kirish</button><button id="up">Ro‘yxatdan o‘tish</button></div>
+<h1>Kirish</h1><p class="sub">Daftaringizga kirish uchun login va parolni kiriting.</p>
+<label for="email">Login</label><input id="email" type="text" autocomplete="username" autocapitalize="none">
+<label for="pass">Parol</label><input id="pass" type="password" autocomplete="current-password">
+<div class="row"><button class="primary" id="in">Kirish</button></div>
 <div id="aerr" role="alert"></div></div>
 <div class="wrap" id="app" hidden>
 <h1>O‘quvchilarning davomat va to‘lov hisobi daftari</h1>
@@ -165,7 +165,7 @@ render();
 var SB_URL="https://zcxemisntksklrdtvffv.supabase.co",SB_KEY="sb_publishable_0oH3JEXo_t1CZfuIIXD7jQ_4NnaB-LH";
 var auth=document.getElementById("auth"),app=document.getElementById("app"),aerr=document.getElementById("aerr");
 function start(ses){
-  uid=ses.user.id;document.getElementById("who").textContent=ses.user.email;auth.hidden=true;app.hidden=false;
+  uid=ses.user.id;document.getElementById("who").textContent=ses.user.email.split("@")[0];auth.hidden=true;app.hidden=false;
   sb.from("registers").select("data").maybeSingle().then(function(r){
     var d=r.data&&r.data.data;
     if(d&&d.rows){data=d;if(!data.head)data.head=HEAD.slice(1);try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}buildInfo();render()}
@@ -173,14 +173,14 @@ function start(ses){
   });
 }
 function msgOf(m){
-  if(/invalid login/i.test(m))return "Email yoki parol noto‘g‘ri.";
+  if(/invalid login/i.test(m))return "Login yoki parol noto‘g‘ri.";
   if(/already registered/i.test(m))return "Bu email ro‘yxatdan o‘tgan. «Kirish» tugmasini bosing.";
   if(/valid email|invalid email/i.test(m))return "Email noto‘g‘ri yozilgan.";
   return m;
 }
 function go(up){
   var e=document.getElementById("email").value.trim(),p=document.getElementById("pass").value;aerr.textContent="";
-  if(!e||p.length<6){aerr.textContent="Email va kamida 6 belgili parol kiriting.";return}
+  if(!e||!p){aerr.textContent="Login va parolni kiriting.";return}if(e.indexOf("@")<0)e=e.toLowerCase()+"@davomat.uz";
   var f=up?sb.auth.signUp({email:e,password:p}):sb.auth.signInWithPassword({email:e,password:p});
   f.then(function(r){
     if(r.error){aerr.textContent=msgOf(r.error.message);return}
@@ -189,7 +189,6 @@ function go(up){
   });
 }
 document.getElementById("in").onclick=function(){go(false)};
-document.getElementById("up").onclick=function(){go(true)};
 document.getElementById("pass").onkeydown=function(e){if(e.key==="Enter")go(false)};
 document.getElementById("out").onclick=function(){sb.auth.signOut().then(function(){try{localStorage.removeItem(KEY)}catch(e){}location.reload()})};
 if(window.supabase){
