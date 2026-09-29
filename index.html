@@ -133,30 +133,45 @@ document.getElementById("file").onchange=function(e){
 
 document.getElementById("pdf").onclick=function(){
   say("PDF tayyorlanmoqda...");
-  var box=mk("div");
-  box.style.cssText="position:fixed;left:-9999px;top:0;background:#fff;color:#000;padding:24px;font:14px/1.4 Arial,sans-serif;width:1500px";
-  var h=mk("div","","O‘QUVCHILARNING DAVOMAT VA TO‘LOV HISOBI DAFTARI");h.style.cssText="font-size:22px;font-weight:700;text-align:center;margin-bottom:4px";box.appendChild(h);
-  var fan=mk("div","","FAN: INGLIZ TILI");fan.style.cssText="text-align:center;font-weight:700;margin-bottom:12px";box.appendChild(fan);
-  var g=mk("div");g.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;margin-bottom:12px";
-  FIELDS.forEach(function(f,i){var d=mk("div");var b=mk("b","",f.replace(" (so‘m)","").toUpperCase()+": ");d.appendChild(b);d.appendChild(document.createTextNode((data.info[i]||"")+(i===6&&data.info[i]?" so‘m":"")));g.appendChild(d)});
-  box.appendChild(g);
-  var t=mk("table");t.style.cssText="border-collapse:collapse;width:100%";
-  function row(arr,th,i){var tr=mk("tr");arr.forEach(function(v,c){var e=mk(th?"th":"td","",v);e.style.cssText="border:1px solid #444;padding:6px 6px;height:28px;text-align:"+(c===1||c===3&&false?"left":"center")+";"+(th?"background:#e6e6e6;":"");if(c===1&&!th)e.style.textAlign="left";tr.appendChild(e)});t.appendChild(tr)}
+  var cs="position:fixed;left:-9999px;top:0;background:#fff;color:#000;font-family:Arial,sans-serif;";
+  var tb=mk("div");tb.style.cssText=cs+"padding:20px;font-size:15px;width:1500px";
+  var t=mk("table");t.style.cssText="border-collapse:collapse;width:100%;table-layout:fixed";
+  function row(arr,th){var tr=mk("tr");arr.forEach(function(v,c){var e=mk(th?"th":"td","",v);
+    e.style.cssText="border:1px solid #333;padding:0 6px;height:30px;overflow:hidden;white-space:nowrap;text-align:"+(c===1&&!th?"left":"center")+";"+(th?"background:#e3e3e3;font-weight:700;":"");
+    if(c===0)e.style.width="44px";if(c===1)e.style.width="270px";tr.appendChild(e)});t.appendChild(tr)}
   row(["T/r"].concat(data.head),true);
   data.rows.forEach(function(r,i){row([String(i+1)].concat(r),false)});
-  box.appendChild(t);document.body.appendChild(box);
-  html2canvas(box,{scale:2,backgroundColor:"#fff"}).then(function(cv){
-    document.body.removeChild(box);
-    var doc=new window.jspdf.jsPDF({orientation:"l",unit:"mm",format:"a4"});
-    var pw=doc.internal.pageSize.getWidth()-14,ph=doc.internal.pageSize.getHeight()-14;
-    var sc=pw/cv.width,pageH=Math.floor(ph/sc),y=0,first=true;
-    while(y<cv.height){
-      var hh=Math.min(pageH,cv.height-y),p=mk("canvas");p.width=cv.width;p.height=hh;
+  tb.appendChild(t);
+  var ib=mk("div");ib.style.cssText=cs+"padding:30px 40px;font-size:20px;width:1200px";
+  var h1=mk("div","","O‘QUVCHILARNING DAVOMAT VA TO‘LOV HISOBI DAFTARI");h1.style.cssText="font-size:30px;font-weight:700;text-align:center;margin-bottom:8px";
+  var h2=mk("div","","FAN: INGLIZ TILI");h2.style.cssText="text-align:center;font-weight:700;font-size:22px;margin-bottom:30px";
+  ib.appendChild(h1);ib.appendChild(h2);
+  var g=mk("div");g.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:18px 40px";
+  FIELDS.forEach(function(f,i){var d=mk("div");d.style.cssText="border-bottom:1px solid #333;padding:6px 0;min-height:40px";
+    d.appendChild(mk("b","",f.replace(" (so‘m)","").toUpperCase()+": "));
+    d.appendChild(document.createTextNode((data.info[i]||"")+(i===6&&data.info[i]?" so‘m":"")));g.appendChild(d)});
+  ib.appendChild(g);
+  var doc=new window.jspdf.jsPDF({orientation:"l",unit:"mm",format:"a4"});
+  var W=doc.internal.pageSize.getWidth()-14,H=doc.internal.pageSize.getHeight()-14;
+  function putTable(cv){
+    var sc=W/cv.width,h=cv.height*sc;
+    if(h>H&&h<H*1.25){sc=H/cv.height;h=H}
+    if(h<=H){doc.addImage(cv.toDataURL("image/jpeg",.95),"JPEG",7+(W-cv.width*sc)/2,7,cv.width*sc,h);return}
+    var pg=Math.floor(H/sc),y=0,f=true;
+    while(y<cv.height){var hh=Math.min(pg,cv.height-y),p=mk("canvas");p.width=cv.width;p.height=hh;
       p.getContext("2d").drawImage(cv,0,y,cv.width,hh,0,0,cv.width,hh);
-      if(!first)doc.addPage();
-      doc.addImage(p.toDataURL("image/jpeg",0.95),"JPEG",7,7,pw,hh*sc);
-      y+=hh;first=false;
-    }
+      if(!f)doc.addPage();doc.addImage(p.toDataURL("image/jpeg",.95),"JPEG",7,7,W,hh*sc);y+=hh;f=false}
+  }
+  document.body.appendChild(tb);
+  html2canvas(tb,{scale:2,backgroundColor:"#fff"}).then(function(c1){
+    document.body.removeChild(tb);putTable(c1);
+    document.body.appendChild(ib);
+    return html2canvas(ib,{scale:2,backgroundColor:"#fff"});
+  }).then(function(c2){
+    document.body.removeChild(ib);
+    doc.addPage();
+    var sc=Math.min(W/c2.width,H/c2.height);
+    doc.addImage(c2.toDataURL("image/jpeg",.95),"JPEG",7+(W-c2.width*sc)/2,7,c2.width*sc,c2.height*sc);
     doc.save("davomat-hisobi.pdf");say("PDF yuklab olindi.");
   }).catch(function(){say("PDF yasashda xatolik bo‘ldi.")});
 };
