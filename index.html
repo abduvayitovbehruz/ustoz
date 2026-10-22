@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="uz"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Farishta</title>
+<title>Davomat va to'lov daftari</title>
 <style>
 :root{--bg:#f5f6f4;--card:#fff;--ink:#1d2624;--mute:#68746f;--line:#d9dfdb;--acc:#1f6f5c;--acc2:#e8f1ee;--danger:#b3402f}
 @media (prefers-color-scheme:dark){:root{--bg:#161b1a;--card:#1f2624;--ink:#e8eeec;--mute:#93a09b;--line:#33403c;--acc:#4fb79d;--acc2:#24332f;--danger:#e37a68}}
@@ -40,6 +40,10 @@ td.x{width:38px;text-align:center}
 #auth input{width:100%;font:inherit;padding:9px 10px;margin:4px 0 12px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--ink)}
 #auth .row{display:flex;gap:8px}#auth .row button{flex:1}
 #aerr{color:var(--danger);min-height:1.4em;font-size:.9rem;margin-top:10px}
+tr.sel td{background:rgba(179,64,47,.16)}
+td.n{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#rowbar{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);display:flex;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;box-shadow:0 6px 24px rgba(0,0,0,.3);z-index:50}
+#rowbar .d{background:var(--danger);border-color:var(--danger);color:#fff}
 </style></head><body>
 <div id="auth" hidden>
 <h1>Kirish</h1><p class="sub">Daftaringizga kirish uchun login va parolni kiriting.</p>
@@ -62,6 +66,8 @@ td.x{width:38px;text-align:center}
 </div>
 <div class="box"><table id="tbl"></table></div>
 <div id="msg" role="status"></div>
+<p class="sub" style="margin-top:6px">Qatorni o‘chirish: qator ustini 1 soniya bosib turing.</p>
+<div id="rowbar" hidden><span id="rbt"></span><button class="d" id="rbdel">O‘chirish</button><button id="rbc">Bekor</button></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -94,9 +100,15 @@ function buildInfo(){info.innerHTML="";FIELDS.forEach(function(f,i){
 })}
 buildInfo();
 
+var selTr=null,selR=-1,rbar=document.getElementById("rowbar");
+function unpick(){if(selTr)selTr.classList.remove("sel");selTr=null;selR=-1;rbar.hidden=true}
+function pick(r,tr){unpick();selTr=tr;selR=r;tr.classList.add("sel");document.getElementById("rbt").textContent=(r+1)+"-qator tanlandi";rbar.hidden=false;if(navigator.vibrate)navigator.vibrate(30)}
+document.getElementById("rbc").onclick=unpick;
+document.getElementById("rbdel").onclick=function(){if(selR<0)return;data.rows.splice(selR,1);save();render();say("Qator o‘chirildi.")};
+document.addEventListener("keydown",function(e){if(e.key==="Escape")unpick()});
 function render(){
-  tbl.innerHTML="";
-  var hr=mk("tr");hr.appendChild(mk("th","n","T/r"));data.head.forEach(function(h,c){var th=mk("th"),i=mk("input");i.value=h;i.setAttribute("aria-label","Ustun nomi");i.oninput=function(){data.head[c]=i.value;save()};th.appendChild(i);hr.appendChild(th)});hr.appendChild(mk("th"));tbl.appendChild(hr);
+  unpick();tbl.innerHTML="";
+  var hr=mk("tr");hr.appendChild(mk("th","n","T/r"));data.head.forEach(function(h,c){var th=mk("th"),i=mk("input");i.value=h;i.setAttribute("aria-label","Ustun nomi");i.oninput=function(){data.head[c]=i.value;save()};th.appendChild(i);hr.appendChild(th)});tbl.appendChild(hr);
   data.rows.forEach(function(row,r){
     var tr=mk("tr");tr.appendChild(mk("td","n",r+1));
     row.forEach(function(v,c){
@@ -105,9 +117,11 @@ function render(){
       i.oninput=function(){if(c===2)i.value=fmtTel(i.value);data.rows[r][c]=i.value;save()};
       td.appendChild(i);tr.appendChild(td);
     });
-    var xd=mk("td","x"),b=mk("button","del","×");b.title="Qatorni o‘chirish";b.setAttribute("aria-label","Qatorni o‘chirish");
-    b.onclick=function(){data.rows.splice(r,1);save();render()};
-    xd.appendChild(b);tr.appendChild(xd);tbl.appendChild(tr);
+    var pt;
+    tr.addEventListener("pointerdown",function(){clearTimeout(pt);pt=setTimeout(function(){pick(r,tr)},650)});
+    ["pointerup","pointerleave","pointercancel"].forEach(function(ev){tr.addEventListener(ev,function(){clearTimeout(pt)})});
+    tr.querySelector("td.n").addEventListener("contextmenu",function(e){e.preventDefault()});
+    tbl.appendChild(tr);
   });
 }
 document.getElementById("addRow").onclick=function(){data.rows.push(blank());save();render()};
