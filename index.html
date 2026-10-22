@@ -84,10 +84,10 @@ for(var i=0;i<30;i++)data.rows.push(blank(names[i]||""));
 try{var s=localStorage.getItem(KEY);if(s)data=JSON.parse(s)}catch(e){}
 if(!data.head)data.head=HEAD.slice(1);
 var tbl=document.getElementById("tbl"),msg=document.getElementById("msg");
-var sb=null,uid=null,tm=null;
+var sb=null,uid=null,tm=null,loaded=false,stamp=0;
 function save(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}
-if(!sb||!uid)return;clearTimeout(tm);tm=setTimeout(cloud,800)}
-function cloud(){say("Saqlanmoqda...");sb.from("registers").upsert({user_id:uid,data:data,updated_at:new Date().toISOString()}).then(function(r){say(r.error?"Saqlanmadi. Internetni tekshiring.":"Saqlandi")})}
+if(!sb||!uid||!loaded)return;clearTimeout(tm);tm=setTimeout(function(){tm=null;cloud()},800)}
+function cloud(){var now=Date.now();say("Saqlanmoqda...");sb.from("registers").upsert({user_id:uid,data:data,updated_at:new Date(now).toISOString()}).then(function(r){if(!r.error)stamp=now;say(r.error?"Saqlanmadi. Internetni tekshiring.":"Saqlandi")})}
 function say(t){msg.textContent=t;setTimeout(function(){if(msg.textContent===t)msg.textContent=""},3000)}
 function fmtTel(v){var d=String(v).replace(/\D/g,"");if(d.length===12&&d.slice(0,3)==="998")d=d.slice(3);d=d.slice(0,9);var o=d.slice(0,2);if(d.length>2)o+=" "+d.slice(2,5);if(d.length>5)o+=" "+d.slice(5,7);if(d.length>7)o+=" "+d.slice(7,9);return o}
 function mk(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt!==undefined)e.textContent=txt;return e}
@@ -204,10 +204,11 @@ var SB_URL="https://zcxemisntksklrdtvffv.supabase.co",SB_KEY="sb_publishable_0oH
 var auth=document.getElementById("auth"),app=document.getElementById("app"),aerr=document.getElementById("aerr");
 function start(ses){
   uid=ses.user.id;document.getElementById("who").textContent=ses.user.email.split("@")[0];auth.hidden=true;app.hidden=false;
-  sb.from("registers").select("data").maybeSingle().then(function(r){
+  sb.from("registers").select("data,updated_at").maybeSingle().then(function(r){
+    if(r.error){msg.textContent="Bazadan o‘qib bo‘lmadi. Sahifani yangilang. Baza o‘zgartirilmadi.";return}
     var d=r.data&&r.data.data;
-    if(d&&d.rows){data=d;if(!data.head)data.head=HEAD.slice(1);try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}buildInfo();render()}
-    else cloud();
+    if(d&&d.rows){data=d;if(!data.head)data.head=HEAD.slice(1);stamp=Date.parse(r.data.updated_at)||0;try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}buildInfo();render();loaded=true}
+    else{loaded=true;cloud()}
   });
 }
 function msgOf(m){
@@ -226,6 +227,15 @@ function go(up){
     start(r.data.session);
   });
 }
+document.addEventListener("visibilitychange",function(){
+  if(document.visibilityState!=="visible"||!sb||!uid||!loaded||tm)return;
+  sb.from("registers").select("data,updated_at").maybeSingle().then(function(r){
+    var d=r.data&&r.data.data;if(r.error||!d||!d.rows)return;
+    var t=Date.parse(r.data.updated_at)||0;
+    if(t>stamp+500&&!tm){data=d;if(!data.head)data.head=HEAD.slice(1);stamp=t;try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}buildInfo();render();say("Yangi ma’lumot yuklandi.")}
+  });
+});
+window.addEventListener("pagehide",function(){if(tm){clearTimeout(tm);tm=null;cloud()}});
 document.getElementById("in").onclick=function(){go(false)};
 document.getElementById("pass").onkeydown=function(e){if(e.key==="Enter")go(false)};
 document.getElementById("out").onclick=function(){sb.auth.signOut().then(function(){try{localStorage.removeItem(KEY)}catch(e){}location.reload()})};
